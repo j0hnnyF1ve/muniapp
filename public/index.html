@@ -25,32 +25,83 @@
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
+    <style>
+      canvas {
+        background: #acdbfd;
+        display: block;
+      }
+    </style>
+    <script src="https://d3js.org/d3.v4.js"></script>
     <script>
+
       let features = new Map();
+/*
+      if( !localStorage.getItem('muni-locs') ) {
+        fetch('http://webservices.nextbus.com/service/publicJSONFeed?command=vehicleLocations&a=sf-muni&r=N&t=1144953500233')
+        .then( (response) => {
+          if(response.ok) {
+            console.log(response);
+            localStorage.setItem('muni-locs', response);
+          }
+        });
+      }
+      console.log( localStorage.getItem('muni-locs') )
+//      localStorage.removeItem('muni-locs');
+
+      let muni-locs = localStorage.getItem('muni-locs') || {};
+*/
+
+      const width = Math.max(800, window.innerWidth-200),
+            height = Math.max(1200, window.innerHeight * 1.5);
+
+      const projection = d3.geoMercator()
+                          .center([-122.4194, 37.7749])
+                          .scale(300000)
+                          .translate([width / 2, height / 2]),
+
+            canvas = d3.select('body').append('canvas')
+                      .attr('height', height)
+                      .attr('width', width),
+
+            ctx = canvas.node().getContext('2d'),
+
+            path = d3.geoPath().projection(projection).context(ctx);
+
+
       window.features = features;
 
       window.addEventListener("load", function() {
 
+        d3.json('sfmaps/streets.json',         addMap('streets', '1', '#ffffff') );
+        d3.json('sfmaps/arteries.json',        addMap('arteries', '2', '#cccccc') );
+        d3.json('sfmaps/freeways.json',        addMap('freeways', '3', '#fff1b3') );
+        d3.json('sfmaps/neighborhoods.json',   addMap('neighborhoods', '1', '#dddddd') );
 
-        fetch('sfmaps/arteries.json').then( handler('arteries') );
-        fetch('sfmaps/freeways.json').then( handler('freeways') );
-        fetch('sfmaps/neighborhoods.json').then( handler('neighborhoods') );
-        fetch('sfmaps/streets.json').then( handler('streets') );
+        function addMap(name, lineWidth = '2', lineColor = '#ffffff', fillStyle = '#eeece6') {
+          return (error, data) => {
+            if(error) { return console.error(error); }
+            features.set(name, { data,lineWidth,lineColor,fillStyle } );
 
-        function handler(name) {
-          return function(response) {
-            if(response.ok === true) {
-              response.json().then(outputData(name) );
+            if(features.size >= 4) {
+              createMap(features.get('neighborhoods'));
+              createMap(features.get('streets'));
+              createMap(features.get('arteries'));
+              createMap(features.get('freeways'));
             }
           }
         }
-        function outputData(name) {
-          return function(data) {
-            console.log(name, data);
-            features.set(name, data.features);
-            console.log(features);
-          }
+
+        function createMap(dataset) {
+          ctx.beginPath();
+          path(dataset.data);
+          ctx.fillStyle = dataset.fillStyle || '#eeece6';
+          ctx.fill();
+          ctx.lineWidth = dataset.lineWidth || '1';
+          ctx.strokeStyle = dataset.lineColor || '#ffffff';
+          ctx.stroke();
         }
+
+
       });
     </script>
     <div id="root"></div>
