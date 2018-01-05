@@ -34,22 +34,28 @@
     <script src="https://d3js.org/d3.v4.js"></script>
     <script>
 
-      let features = new Map();
-/*
+
+      // temp code so we don't hammer the webservices.nextbus.com API
       if( !localStorage.getItem('muni-locs') ) {
-        fetch('http://webservices.nextbus.com/service/publicJSONFeed?command=vehicleLocations&a=sf-muni&r=N&t=1144953500233')
+       fetch('http://webservices.nextbus.com/service/publicJSONFeed?command=vehicleLocations&a=sf-muni&r=N&t=1144953500233')
         .then( (response) => {
           if(response.ok) {
-            console.log(response);
-            localStorage.setItem('muni-locs', response);
+            return response.json();
           }
+        })
+        .then( (json) => {
+          localStorage.setItem('muni-locs', JSON.stringify(json) );
         });
       }
-      console.log( localStorage.getItem('muni-locs') )
 //      localStorage.removeItem('muni-locs');
 
-      let muni-locs = localStorage.getItem('muni-locs') || {};
-*/
+      let muniLocs = localStorage.getItem('muni-locs') || {};
+      try {
+        muniLocs = JSON.parse(muniLocs);
+      }
+      catch(e) { console.error('JSON.parse Error:', e); }
+
+      let features = new Map();
 
       const width = Math.max(800, window.innerWidth-200),
             height = Math.max(1200, window.innerHeight * 1.5);
@@ -100,7 +106,6 @@
           ctx.strokeStyle = dataset.lineColor || '#ffffff';
           ctx.stroke();
         }
-
 
       });
     </script>
