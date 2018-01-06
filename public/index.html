@@ -30,38 +30,55 @@
         background: #acdbfd;
         display: block;
       }
+
+      .gui {
+        position: fixed;
+        right: 20px;
+        top: 0;
+        background-color: #fff;
+        border: solid 1px #666;
+        padding: 0;
+      }
+      .gui h1 { font-size: 14px; background-color: #ddd; margin:0; padding: 3px; text-align: center; }
+      .gui ul {
+        margin: 0;
+        padding: 10px;
+        list-style-type: none;
+      }
+      .gui ul li {}
+      .gui ul li div.color {
+        border: solid 1px black;
+        display: inline-block;
+        width: 20px;
+        height: 10px;
+        margin: 0 5px;
+      }
+
     </style>
     <script src="https://d3js.org/d3.v4.js"></script>
     <script>
 
+// TODO:
+// - Add id to each tag in drawing
+// - Reactify this app
 
-      // temp code so we don't hammer the webservices.nextbus.com API
-      if( !localStorage.getItem('muni-locs') ) {
-       fetch('http://webservices.nextbus.com/service/publicJSONFeed?command=vehicleLocations&a=sf-muni&r=N&t=1144953500233')
-        .then( (response) => {
-          if(response.ok) {
-            return response.json();
-          }
-        })
-        .then( (json) => {
-          localStorage.setItem('muni-locs', JSON.stringify(json) );
-        });
-      }
-//      localStorage.removeItem('muni-locs');
 
-      let muniLocs = localStorage.getItem('muni-locs') || {};
-      try {
-        muniLocs = JSON.parse(muniLocs);
-      }
-      catch(e) { console.error('JSON.parse Error:', e); }
-
+      // data sources
       let features = new Map();
+      let vehicleLocs = new Map();
+      let tags = new Map();
+
+      let lastTime = Date.now();
+      let intervalId;
+
+      window.vehicleLocs = vehicleLocs; // for debugging
+      window.tags = tags;
 
       const width = Math.max(800, window.innerWidth-200),
             height = Math.max(1200, window.innerHeight * 1.5);
 
       const projection = d3.geoMercator()
-                          .center([-122.4194, 37.7749])
+                          .center([-122.4194-.01, 37.7749])
                           .scale(300000)
                           .translate([width / 2, height / 2]),
 
@@ -71,43 +88,221 @@
 
             ctx = canvas.node().getContext('2d'),
 
+            circle = d3.geoCircle();
             path = d3.geoPath().projection(projection).context(ctx);
 
+        const gui    = document.body.appendChild( document.createElement('form') );
+        gui.className = 'gui';
+        const title = document.createElement('h1'); title.innerHTML = 'Bus Routes';
+        gui.appendChild( title );
+        const list = gui.appendChild( document.createElement('ul') );
 
-      window.features = features;
 
-      window.addEventListener("load", function() {
+//      localStorage.removeItem('vehicleLocs');
+
+      // temp code so we don't hammer the webservices.nextbus.com API
+      // place this code in promise or other delayed execution code
+      if( !localStorage.getItem('vehicleLocs') ) {
+        updateVehicleLocs(null, loadHandler);
+      }
+      else {
+        window.addEventListener("load", loadHandler);
+      }
+
+      function loadHandler() {
+//        vehicleLocs = getCurrentVehicleLocs();
 
         d3.json('sfmaps/streets.json',         addMap('streets', '1', '#ffffff') );
         d3.json('sfmaps/arteries.json',        addMap('arteries', '2', '#cccccc') );
         d3.json('sfmaps/freeways.json',        addMap('freeways', '3', '#fff1b3') );
         d3.json('sfmaps/neighborhoods.json',   addMap('neighborhoods', '1', '#dddddd') );
+      }
 
-        function addMap(name, lineWidth = '2', lineColor = '#ffffff', fillStyle = '#eeece6') {
-          return (error, data) => {
-            if(error) { return console.error(error); }
-            features.set(name, { data,lineWidth,lineColor,fillStyle } );
+      function addMap(name, lineWidth = '2', lineColor = '#ffffff', fillStyle = '#eeece6') {
+        return (error, data) => {
+          if(error) { return console.error(error); }
+          features.set(name, { data,lineWidth,lineColor,fillStyle } );
 
-            if(features.size >= 4) {
-              createMap(features.get('neighborhoods'));
-              createMap(features.get('streets'));
-              createMap(features.get('arteries'));
-              createMap(features.get('freeways'));
-            }
+          // if all features have been loaded
+          if(features.size >= 4) {
+            drawMap(features.get('neighborhoods'));
+            drawMap(features.get('streets'));
+            drawMap(features.get('arteries'));
+            drawMap(features.get('freeways'));
+
+            updateVehicleLocs(0, () => {
+              updateTags();
+              createTagsGui();
+              drawVehicles();
+              updateLastTime();
+            });
+
+
+            intervalId = window.setInterval( () => {
+
+              updateVehicleLocs(getLastTime(), () => {
+                clearMap();
+                drawMap(features.get('neighborhoods'));
+                drawMap(features.get('streets'));
+                drawMap(features.get('arteries'));
+                drawMap(features.get('freeways'));
+
+                updateTags();
+//                updateTagsGui();
+                drawVehicles();
+                updateLastTime();
+              })
+            }, 15000);
+            window.intervalId = intervalId; // for debugging purposes, we can stop the interval in the console so we don't keep pinging the server
           }
         }
+      }
 
-        function createMap(dataset) {
-          ctx.beginPath();
-          path(dataset.data);
-          ctx.fillStyle = dataset.fillStyle || '#eeece6';
-          ctx.fill();
-          ctx.lineWidth = dataset.lineWidth || '1';
-          ctx.strokeStyle = dataset.lineColor || '#ffffff';
-          ctx.stroke();
+      function clearMap() { ctx.clearRect(0,0, width, height); }
+
+      function drawMap(dataset) {
+        ctx.beginPath();
+        path(dataset.data);
+        ctx.fillStyle = dataset.fillStyle || '#eeece6';
+        ctx.fill();
+        ctx.lineWidth = dataset.lineWidth || '1';
+        ctx.strokeStyle = dataset.lineColor || '#ffffff';
+        ctx.stroke();
+      }
+
+      function drawVehicle(color, latlon) {
+        ctx.beginPath();
+        path( circle.center(latlon).radius(.001)() );
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = '1';
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+      }
+
+      function drawVehicles() {
+        if(!vehicleLocs.entries) { return console.error('drawVehicles Error: No Vehicle Locations supplied'); }
+
+        for(let [key, vehicle] of vehicleLocs.entries() ) {
+          let tag = tags.get(vehicle.routeTag);
+          if( tag.active == true ) {
+            drawVehicle( tag.color, [vehicle.lon, vehicle.lat] );
+          }
+        }
+      }
+
+      function updateVehicleLocs(timestamp = 0, callback) {
+        console.log('updating...', Date.now() );
+        let url =     'http://webservices.nextbus.com/service/publicJSONFeed?command=vehicleLocations&a=sf-muni';
+        if(timestamp > 0) {
+            url += '&t=' + timestamp;
         }
 
-      });
+        fetch(url)
+        .then( (response) => { if(response.ok) { return response.json(); } })
+        .then( (json) => {
+          if(!json.vehicle) {
+            return console.log('No new information');
+          }
+          console.log('Updated...', json);
+
+          let vehicleLocsMap = vehicleLocs;
+
+          for(let vehicle of json.vehicle) {
+              vehicleLocsMap.set(vehicle.id, vehicle);
+          }
+
+          // sync stored map
+          setCurrentVehicleLocs(vehicleLocsMap);
+        })
+        .then(callback);
+      }
+
+      // Takes the list of Vehicle Locations and populates the tags map
+      // Assigns a color to a tag on creation
+      function updateTags() {
+//        tags = new Map();
+        for(let [key, vehicle] of vehicleLocs) {
+          // just add the vehicle if it doesn't exist
+          if(tags.has(vehicle.routeTag) ) {
+            let curTag = tags.get(vehicle.routeTag);
+
+            if(curTag && curTag.vehicles.length > 0 && curTag.vehicles && !curTag.vehicles.includes(vehicle.id) ) {
+              curTag.vehicles.push(vehicle.id);
+              tags.set(vehicle.routeTag, curTag );
+            }
+          }
+          // Tag doesn't exist, create a new tag
+          else {
+            let color = 'rgb(red, green, blue)'
+                                          .replace('red', Math.floor( Math.random() * 255) )
+                                          .replace('green', Math.floor( Math.random() * 255) )
+                                          .replace('blue', Math.floor( Math.random() * 255) );
+
+            tags.set(vehicle.routeTag, { color, active: true, vehicles: [vehicle.id] });
+          }
+        }
+      }
+
+      function createTagsGui() {
+/*
+        for(let child of list.children) {
+          list.remove(child);
+        }
+*/
+        for(let [key, tag] of tags ) {
+          let li = document.createElement('li');
+
+          let checkbox = document.createElement('input');
+          checkbox.id = key;
+          checkbox.type = 'checkbox';
+          checkbox.checked = tag.active; //true;
+          checkbox.addEventListener('click', checkboxClickHandler);
+
+          let label = document.createElement('label');
+          label.setAttribute('for', key);
+          label.innerHTML = key;
+
+          let div = document.createElement('div');
+          div.className = 'color';
+          div.style.backgroundColor = tag.color;
+
+          li.appendChild( checkbox );
+          li.appendChild( div );
+          li.appendChild( label );
+          list.appendChild( li );
+        }
+      }
+
+      function checkboxClickHandler(event) {
+        if(!tags.has(this.id)) { return; }
+        tags.get(this.id).active = this.checked;
+
+        drawMap(features.get('neighborhoods'));
+        drawMap(features.get('streets'));
+        drawMap(features.get('arteries'));
+        drawMap(features.get('freeways'));
+
+        drawVehicles();
+      }
+
+      function updateLastTime() { lastTime = Date.now(); }
+      function getLastTime() { return lastTime; }
+
+      function getCurrentVehicleLocs() {
+        let locs = localStorage.getItem('vehicleLocs') || {};
+        try {
+          locs = new Map( JSON.parse(vehicleLocs) );
+        }
+        catch(e) { console.error('JSON.parse Error:', e); }
+
+        return locs;
+      }
+
+      function setCurrentVehicleLocs(vehicleLocsMap) {
+        localStorage.setItem('vehicleLocs', JSON.stringify( Array.from(vehicleLocsMap.entries())) );
+        vehicleLocs = vehicleLocsMap;
+      }
     </script>
     <div id="root"></div>
     <!--
