@@ -3,3 +3,34 @@ body {
   padding: 0;
   font-family: sans-serif;
 }
+
+canvas {
+  background: #acdbfd;
+  display: inline-block;
+  width: 80%;
+  height: 65%;
+}
+
+.gui {
+  position: fixed;
+  right: 20px;
+  top: 0;
+  background-color: #fff;
+  border: solid 1px #666;
+  padding: 0;
+}
+.gui h1 { font-size: 14px; background-color: #ddd; margin:0; padding: 3px; text-align: center; }
+.gui ul {
+  margin: 0;
+  padding: 10px;
+  list-style-type: none;
+}
+.gui ul li { text-align: left; }
+.gui ul li div.color {
+  border: solid 1px black;
+  display: inline-block;
+  width: 20px;
+  height: 10px;
+  margin: 0 5px;
+}
+.gui ul li label { min-width: 50px; display: inline-block; text-align: left; }
