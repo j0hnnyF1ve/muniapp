@@ -10,7 +10,7 @@ class App extends Component {
     return (
       <div className="App">
         <header className="App-header">
-          <h1 className="App-title">SF Muni App</h1>
+          <h1 className="App-title">SF Muni & Transit App</h1>
         </header>
         <DataContainer />
       </div>
@@ -275,7 +275,6 @@ class GuiListItem extends Component {
   }
 
   render() {
-
     const divStyle = { backgroundColor: this.props.bgcolor };
 
     return (

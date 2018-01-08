@@ -18,6 +18,8 @@ canvas {
   background-color: #fff;
   border: solid 1px #666;
   padding: 0;
+  overflow: auto;
+  height: 100%;
 }
 .gui h1 { font-size: 14px; background-color: #ddd; margin:0; padding: 3px; text-align: center; }
 .gui ul {
