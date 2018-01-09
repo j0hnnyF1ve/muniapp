@@ -5,6 +5,8 @@
   "dependencies": {
     "d3": "^4.12.2",
     "http-server": "^0.10.0",
+    "jest-canvas-mock": "0.0.3",
+    "jest-fetch-mock": "^1.4.0",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
     "react-scripts": "1.0.17"
