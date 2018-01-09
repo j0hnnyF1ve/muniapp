@@ -10,10 +10,15 @@ class DataContainer extends Component {
     this.state = {
       maps: {},
       vehicles: new Map(),
-      routeTags: new Map()
+      routeTags: new Map(),
+      width: 0,
+      height: 0,
+      timeoutId: null
     };
 
     this.tagClickHandler = this.tagClickHandler.bind(this);
+    this.selectAllHandler = this.selectAllHandler.bind(this);
+    this.deselectAllHandler = this.deselectAllHandler.bind(this);
   }
 
   // passed down to children input checkboxes
@@ -26,8 +31,33 @@ class DataContainer extends Component {
     this.setState({ routeTags });
   }
 
+  selectAllHandler() {
+    const routeTags = this.state.routeTags;
+    for(let [id, tag] of routeTags) {
+      tag.active = true;
+      routeTags.set(id, tag);
+    }
+
+    this.setState({ routeTags });
+  }
+
+  deselectAllHandler() {
+    const routeTags = this.state.routeTags;
+    for(let [id, tag] of routeTags) {
+      tag.active = false;
+      routeTags.set(id, tag);
+    }
+
+    this.setState({ routeTags });
+  }
+
   componentDidMount() {
     const self = this;
+
+    this.setState({
+      width: window.innerWidth-200,
+      height: (window.innerWidth-200) * 0.8
+    });
 
     self.lastTimestamp = Date.now();
     updateVehicleLocs(0);
@@ -112,16 +142,15 @@ class DataContainer extends Component {
 
   componentWillUnmount() {
     window.clearInterval(this.intervalId);
+
+    window.removeEventListener('resize', this.updateDimensions);
   }
 
   render() {
-    const width = Math.max(800, window.innerWidth-200);
-    const height = Math.max(1200, window.innerHeight * 1.5);
-
     return(
       <div className="dataContainer">
-        <SfMap width={width} height={height} maps={this.state.maps} vehicles={this.state.vehicles} tags={this.state.routeTags}></SfMap>
-        <Gui guiTitle="Bus Routes" tags={this.state.routeTags} tagClickAction={this.tagClickHandler}></Gui>
+        <SfMap width={this.state.width} height={this.state.height} maps={this.state.maps} vehicles={this.state.vehicles} tags={this.state.routeTags}></SfMap>
+        <Gui guiTitle="Bus Routes" tags={this.state.routeTags} tagClickAction={this.tagClickHandler} selectAllAction={this.selectAllHandler} deselectAllAction={this.deselectAllHandler}></Gui>
       </div>
     );
   }
