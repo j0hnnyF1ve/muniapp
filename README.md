@@ -3,6 +3,8 @@ To start the application:
 
 2. Run `npm start` - Start react web server
 
+For running basic render tests:
+1. Run `npm test`
 -----
 
 D3 Wiki
